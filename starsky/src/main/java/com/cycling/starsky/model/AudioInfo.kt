@@ -1,5 +1,8 @@
 package com.cycling.starsky.model
 
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class AudioInfo(
     val songId: String = "",
     val songUrl: String,
@@ -8,8 +11,7 @@ data class AudioInfo(
     val albumName: String = "",
     val coverUrl: String = "",
     val duration: Long = 0L,
-    val mimeType: String? = null,
-    val extras: Map<String, Any> = emptyMap()
+    val mimeType: String? = null
 ) {
     companion object {
         fun create(url: String): AudioInfo = AudioInfo(

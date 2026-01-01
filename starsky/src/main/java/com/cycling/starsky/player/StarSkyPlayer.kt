@@ -17,6 +17,7 @@ import com.cycling.starsky.model.PlayMode
 import com.cycling.starsky.model.PlaybackState
 import com.cycling.starsky.listener.OnPlayerEventListener
 import com.cycling.starsky.notification.StarSkyNotificationManager
+import com.cycling.starsky.preferences.StarSkyPreferencesManager
 import com.cycling.starsky.service.StarSkyMediaSessionService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -30,6 +31,7 @@ import kotlinx.coroutines.launch
 class StarSkyPlayer(private val context: Context) {
 
     private val cacheManager = StarSkyCacheManager.getInstance(context)
+    private val preferencesManager = StarSkyPreferencesManager(context)
 
     private var exoPlayer: ExoPlayer = createPlayer()
 
@@ -68,6 +70,7 @@ class StarSkyPlayer(private val context: Context) {
 
     private val playerScope = CoroutineScope(Dispatchers.Main + Job())
     private var positionUpdateJob: Job? = null
+    private var lastPositionSaveTime = 0L
 
     private var notificationManager: StarSkyNotificationManager? = null
     private var mediaSession: MediaSession? = null
@@ -165,6 +168,10 @@ class StarSkyPlayer(private val context: Context) {
         exoPlayer.play()
 
         _currentAudio.value = audioInfo
+
+        playerScope.launch {
+            preferencesManager.saveCurrentAudio(audioInfo)
+        }
     }
 
     fun playPlaylist(audioList: List<AudioInfo>, startIndex: Int = 0) {
@@ -192,6 +199,12 @@ class StarSkyPlayer(private val context: Context) {
         exoPlayer.play()
 
         _currentAudio.value = audioList.getOrNull(startIndex)
+
+        playerScope.launch {
+            preferencesManager.savePlaylist(audioList)
+            preferencesManager.saveCurrentIndex(startIndex)
+            preferencesManager.saveCurrentAudio(audioList.getOrNull(startIndex))
+        }
     }
 
     fun pause() {
@@ -251,16 +264,28 @@ class StarSkyPlayer(private val context: Context) {
             PlayMode.SHUFFLE -> Player.REPEAT_MODE_ALL
         }
         notifyPlayModeChanged(mode)
+
+        playerScope.launch {
+            preferencesManager.savePlayMode(mode)
+        }
     }
 
     fun setVolume(volume: Float) {
         exoPlayer.volume = volume.coerceIn(0f,1f)
+
+        playerScope.launch {
+            preferencesManager.saveVolume(volume)
+        }
     }
 
     fun getVolume(): Float = exoPlayer.volume
 
     fun setSpeed(speed: Float) {
         exoPlayer.setPlaybackSpeed(speed.coerceIn(0.5f, 2f))
+
+        playerScope.launch {
+            preferencesManager.saveSpeed(speed)
+        }
     }
 
     fun getSpeed(): Float = exoPlayer.playbackParameters.speed
@@ -315,9 +340,17 @@ class StarSkyPlayer(private val context: Context) {
         positionUpdateJob = playerScope.launch {
             while (true) {
                 delay(100)
-                _playbackPosition.value = exoPlayer.currentPosition
+                val currentPosition = exoPlayer.currentPosition
+                val currentTime = System.currentTimeMillis()
+                
+                _playbackPosition.value = currentPosition
                 _playbackDuration.value = exoPlayer.duration
-                notifyPlayProgress(exoPlayer.currentPosition, exoPlayer.duration)
+                notifyPlayProgress(currentPosition, exoPlayer.duration)
+
+                if (currentTime - lastPositionSaveTime >= 1000) {
+                    preferencesManager.savePlaybackPosition(currentPosition)
+                    lastPositionSaveTime = currentTime
+                }
             }
         }
     }

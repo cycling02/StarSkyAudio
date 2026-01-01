@@ -1,0 +1,34 @@
+root = true
+
+[*.{kt,kts}]
+charset = utf-8
+indent_style = ktlint_official
+max_line_length = 120
+
+[*.{kt,kts}]
+ktlint_standard = ktlint_official
+ij_kotlin_allow_trailing_comma = true
+ij_kotlin_allow_trailing_comma_on_call_site = true
+ij_kotlin_allow_trailing_comma_on_value_parameter = true
+ij_kotlin_allow_trailing_comma_on_value_parameter_assignment = true
+ij_kotlin_allow_trailing_comma_on_value_parameter_entry = true
+ktlint_standard = ktlint_official
+ktlint_code_style = android
+android = true
+
+# 禁用某些规则
+disabled_rules = no-wildcard-imports
+excluded = **/build/**,**/generated/**
+
+# 格式化规则
+[*.kt]
+indent_size = 4
+continuation_indent_size = 4
+insert_final_newline = true
+max_line_length = 120
+
+[*.kts]
+indent_size = 4
+continuation_indent_size = 4
+insert_final_newline = true
+max_line_length = 120
