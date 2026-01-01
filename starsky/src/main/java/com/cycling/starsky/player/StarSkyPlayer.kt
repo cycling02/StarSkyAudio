@@ -16,7 +16,6 @@ import com.cycling.starsky.model.AudioInfo
 import com.cycling.starsky.model.PlayMode
 import com.cycling.starsky.model.PlaybackState
 import com.cycling.starsky.listener.OnPlayerEventListener
-import com.cycling.starsky.model.toPlaybackState
 import com.cycling.starsky.notification.StarSkyNotificationManager
 import com.cycling.starsky.service.StarSkyMediaSessionService
 import kotlinx.coroutines.CoroutineScope
@@ -94,14 +93,30 @@ class StarSkyPlayer(private val context: Context) {
     }
 
     private val playerListener = object : Player.Listener {
+        private var currentPlaybackState = Player.STATE_IDLE
+        private var currentIsPlaying = false
+
         override fun onPlaybackStateChanged(playbackState: Int) {
-            val state = playbackState.toPlayerState().toPlaybackState()
-            _playbackState.value = state
-            notifyPlaybackStateChanged(state)
+            currentPlaybackState = playbackState
+            updatePlaybackState()
         }
 
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _isPlaying.value = isPlaying
+            currentIsPlaying = isPlaying
+            updatePlaybackState()
+        }
+
+        private fun updatePlaybackState() {
+            val state = when (currentPlaybackState) {
+                Player.STATE_IDLE -> PlaybackState.Idle
+                Player.STATE_BUFFERING -> PlaybackState.Buffering
+                Player.STATE_READY -> if (currentIsPlaying) PlaybackState.Playing else PlaybackState.Paused
+                Player.STATE_ENDED -> PlaybackState.Completed
+                else -> PlaybackState.Idle
+            }
+            _playbackState.value = state
+            _isPlaying.value = currentIsPlaying
+            notifyPlaybackStateChanged(state)
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {

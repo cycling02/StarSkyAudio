@@ -12,10 +12,10 @@ sealed class PlaybackState {
     data class Error(val message: String, val exception: Throwable? = null) : PlaybackState()
 }
 
-fun Player.State.toPlaybackState(): PlaybackState = when (this) {
-    Player.State.IDLE -> PlaybackState.Idle
-    Player.State.BUFFERING -> PlaybackState.Buffering
-    Player.State.READY -> PlaybackState.Playing
-    Player.State.ENDED -> PlaybackState.Completed
+fun Int.toPlaybackState(isPlaying: Boolean): PlaybackState = when (this) {
+    Player.STATE_IDLE -> PlaybackState.Idle
+    Player.STATE_BUFFERING -> PlaybackState.Buffering
+    Player.STATE_READY -> if (isPlaying) PlaybackState.Playing else PlaybackState.Paused
+    Player.STATE_ENDED -> PlaybackState.Completed
     else -> PlaybackState.Idle
 }

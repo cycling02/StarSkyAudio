@@ -9,11 +9,12 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.session.MediaSession
-import androidx.media3.session.SessionToken
 import androidx.media3.ui.PlayerNotificationManager
 import com.cycling.starsky.R
 
+@OptIn(UnstableApi::class)
 class StarSkyNotificationManager(
     private val context: Context,
     private val player: Player,
@@ -41,7 +42,6 @@ class StarSkyNotificationManager(
             .build()
 
         playerNotificationManager?.setPlayer(player)
-        playerNotificationManager?.setMediaSessionToken(mediaSession.sessionCompatToken)
     }
 
     fun stopNotification() {
@@ -58,7 +58,7 @@ class StarSkyNotificationManager(
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_LOW
+                NotificationManager.IMPORTANCE_DEFAULT
             ).apply {
                 description = "Music playback controls"
                 setShowBadge(false)
