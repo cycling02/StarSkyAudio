@@ -80,7 +80,7 @@ afterEvaluate {
             create<MavenPublication>("release") {
                 from(components.findByName("release"))
                 
-                groupId = "com.github.cycling"
+                groupId = "com.github.cycling02"
                 artifactId = "StarSkyAudio"
                 version = "1.0.0"
                 
@@ -98,16 +98,16 @@ afterEvaluate {
                     
                     developers {
                         developer {
-                            id.set("cycling")
+                            id.set("cycling02")
                             name.set("Cycling")
                             email.set("cycling@example.com")
                         }
                     }
                     
                     scm {
-                        connection.set("scm:git:github.com/cycling/StarSkyAudio.git")
-                        developerConnection.set("scm:git:ssh://github.com/cycling/StarSkyAudio.git")
-                        url.set("https://github.com/cycling/StarSkyAudio")
+                        connection.set("scm:git:github.com/cycling02/StarSkyAudio.git")
+                        developerConnection.set("scm:git:ssh://github.com/cycling02/StarSkyAudio.git")
+                        url.set("https://github.com/cycling02/StarSkyAudio")
                     }
                 }
             }
