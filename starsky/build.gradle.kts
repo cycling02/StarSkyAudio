@@ -5,8 +5,8 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.cycling02"
-version = "1.1.0"
+group = "com.cycling.starsky"
+version = "1.2.0"
 
 android {
     namespace = "com.cycling.starsky"
@@ -80,9 +80,9 @@ afterEvaluate {
             create<MavenPublication>("release") {
                 from(components.findByName("release"))
                 
-                groupId = "com.github.cycling02"
+                groupId = "com.cycling.starsky"
                 artifactId = "StarSkyAudio"
-                version = "1.1.0"
+                version = "1.2.0"
                 
                 pom {
                     name.set("StarSkyAudio")
@@ -98,7 +98,7 @@ afterEvaluate {
                     
                     developers {
                         developer {
-                            id.set("cycling02")
+                            id.set("cycling")
                             name.set("Cycling")
                             email.set("cycling@example.com")
                         }
