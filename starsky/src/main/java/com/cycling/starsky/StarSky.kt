@@ -2,122 +2,213 @@ package com.cycling.starsky
 
 import android.content.Context
 import com.cycling.starsky.cache.StarSkyCacheManager
+import com.cycling.starsky.config.StarSkyConfig
 import com.cycling.starsky.listener.OnPlayerEventListener
 import com.cycling.starsky.model.AudioInfo
 import com.cycling.starsky.model.PlayMode
 import com.cycling.starsky.model.PlaybackState
+import com.cycling.starsky.control.PlayerControl
+import com.cycling.starsky.control.PlayerControlImpl
 import com.cycling.starsky.player.StarSkyPlayer
 import com.cycling.starsky.preferences.StarSkyPreferencesManager
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 
 object StarSky {
 
-    private var player: StarSkyPlayer? = null
+    private var playerControl: PlayerControl? = null
     private lateinit var context: Context
     private val preferencesManager by lazy { StarSkyPreferencesManager(context) }
+    private var initialized = false
+    private val configBuilder = StarSkyConfig.Builder()
+    private val scope = CoroutineScope(Dispatchers.Main)
 
-    fun init(context: Context) {
-        this.context = context.applicationContext
-        if (player == null) {
-            player = StarSkyPlayer(this.context)
+    fun init(application: android.app.Application): StarSky {
+        if (initialized) {
+            throw IllegalStateException("StarSky already initialized")
         }
+        this.context = application.applicationContext
+        initialized = true
+        return this
     }
 
-    fun getPlayer(): StarSkyPlayer {
-        return player ?: throw IllegalStateException("StarSky not initialized. Call init() first.")
+    fun setOpenCache(open: Boolean): StarSky {
+        configBuilder.setOpenCache(open)
+        return this
+    }
+
+    fun setNotificationEnabled(enabled: Boolean): StarSky {
+        configBuilder.setNotificationEnabled(enabled)
+        return this
+    }
+
+    fun setAutoPlay(autoPlay: Boolean): StarSky {
+        configBuilder.setAutoPlay(autoPlay)
+        return this
+    }
+
+    fun setRestoreState(restore: Boolean): StarSky {
+        configBuilder.setRestoreState(restore)
+        return this
+    }
+
+    fun apply(): StarSky {
+        if (!initialized) {
+            throw IllegalStateException("StarSky not initialized. Call init() first.")
+        }
+        
+        if (playerControl == null) {
+            val config = configBuilder.build()
+            playerControl = PlayerControlImpl(this.context, config)
+        }
+        
+        if (configBuilder.build().notificationEnabled) {
+            playerControl?.enableNotification()
+        } else {
+            playerControl?.disableNotification()
+        }
+        
+        if (configBuilder.build().restoreState) {
+            playerControl?.let {
+                scope.launch {
+                    restorePlaybackState()
+                }
+            }
+        }
+        
+        return this
+    }
+
+    fun with(context: Context): PlayerControl {
+        if (!initialized) {
+            throw IllegalStateException("StarSky not initialized. Call init() in Application class first.")
+        }
+        return playerControl ?: throw IllegalStateException("PlayerControl not initialized")
     }
 
     fun play(audioInfo: AudioInfo) {
-        getPlayer().play(audioInfo)
+        playerControl?.play(audioInfo)
     }
 
     fun playPlaylist(audioList: List<AudioInfo>, startIndex: Int = 0) {
-        getPlayer().playPlaylist(audioList, startIndex)
+        playerControl?.playPlaylist(audioList, startIndex)
+    }
+
+    fun addSongInfo(audioInfo: AudioInfo) {
+        playerControl?.addSongInfo(audioInfo)
+    }
+
+    fun addSongInfoAt(audioInfo: AudioInfo, index: Int) {
+        playerControl?.addSongInfoAt(audioInfo, index)
+    }
+
+    fun removeSongInfo(index: Int) {
+        playerControl?.removeSongInfo(index)
+    }
+
+    fun clearPlaylist() {
+        playerControl?.clearPlaylist()
     }
 
     fun pause() {
-        getPlayer().pause()
+        playerControl?.pause()
     }
 
     fun resume() {
-        getPlayer().resume()
+        playerControl?.resume()
     }
 
     fun stop() {
-        getPlayer().stop()
+        playerControl?.stop()
     }
 
     fun seekTo(position: Long) {
-        getPlayer().seekTo(position)
+        playerControl?.seekTo(position)
     }
 
     fun next() {
-        getPlayer().next()
+        playerControl?.next()
     }
 
     fun previous() {
-        getPlayer().previous()
+        playerControl?.previous()
     }
 
     fun setPlayMode(mode: PlayMode) {
-        getPlayer().setPlayMode(mode)
+        playerControl?.setPlayMode(mode)
     }
 
     fun setVolume(volume: Float) {
-        getPlayer().setVolume(volume)
+        playerControl?.setVolume(volume)
     }
 
     fun getVolume(): Float {
-        return getPlayer().getVolume()
+        return playerControl?.getVolume() ?: 1.0f
     }
 
     fun setSpeed(speed: Float) {
-        getPlayer().setSpeed(speed)
+        playerControl?.setSpeed(speed)
     }
 
     fun getSpeed(): Float {
-        return getPlayer().getSpeed()
+        return playerControl?.getSpeed() ?: 1.0f
     }
 
     val playbackState: StateFlow<PlaybackState>
-        get() = getPlayer().playbackState
+        get() = playerControl?.playbackState ?: throw IllegalStateException("StarSky not initialized")
 
     val currentAudio: StateFlow<AudioInfo?>
-        get() = getPlayer().currentAudio
+        get() = playerControl?.currentAudio ?: throw IllegalStateException("StarSky not initialized")
 
     val playMode: StateFlow<PlayMode>
-        get() = getPlayer().playMode
+        get() = playerControl?.playMode ?: throw IllegalStateException("StarSky not initialized")
 
     val playbackPosition: StateFlow<Long>
-        get() = getPlayer().playbackPosition
+        get() = playerControl?.playbackPosition ?: throw IllegalStateException("StarSky not initialized")
 
     val playbackDuration: StateFlow<Long>
-        get() = getPlayer().playbackDuration
+        get() = playerControl?.playbackDuration ?: throw IllegalStateException("StarSky not initialized")
 
     val isPlaying: StateFlow<Boolean>
-        get() = getPlayer().isPlaying
+        get() = playerControl?.isPlaying ?: throw IllegalStateException("StarSky not initialized")
 
-    fun getExoPlayer() = getPlayer().getExoPlayer()
+    val currentPlaylist: StateFlow<List<AudioInfo>>
+        get() = playerControl?.currentPlaylist ?: throw IllegalStateException("StarSky not initialized")
 
-    fun getCurrentPlaylist() = getPlayer().getCurrentPlaylist()
+    val currentIndex: StateFlow<Int>
+        get() = playerControl?.currentIndex ?: throw IllegalStateException("StarSky not initialized")
 
-    fun getCurrentIndex() = getPlayer().getCurrentIndex()
+    fun getExoPlayer() = playerControl?.getExoPlayer() ?: throw IllegalStateException("StarSky not initialized")
+
+    fun getCurrentPlaylist() = playerControl?.getCurrentPlaylist() ?: emptyList()
+
+    fun getCurrentIndex() = playerControl?.getCurrentIndex() ?: -1
+
+    fun getBufferedPosition() = playerControl?.getBufferedPosition() ?: 0L
+
+    fun isBuffering() = playerControl?.isBuffering() ?: false
+
+    fun isCurrMusicIsBuffering(audioInfo: AudioInfo) = playerControl?.isCurrMusicIsBuffering(audioInfo) ?: false
+
+    fun hasNetworkError() = playerControl?.hasNetworkError() ?: false
 
     fun addListener(listener: OnPlayerEventListener) {
-        getPlayer().addListener(listener)
+        playerControl?.addListener(listener)
     }
 
     fun removeListener(listener: OnPlayerEventListener) {
-        getPlayer().removeListener(listener)
+        playerControl?.removeListener(listener)
     }
 
     fun enableNotification() {
-        getPlayer().enableNotification()
+        playerControl?.enableNotification()
     }
 
     fun disableNotification() {
-        getPlayer().disableNotification()
+        playerControl?.disableNotification()
     }
 
     fun clearCache() {
@@ -129,6 +220,7 @@ object StarSky {
     }
 
     suspend fun restorePlaybackState() {
+        val config = configBuilder.build()
         val currentAudio = preferencesManager.getCurrentAudio().first()
         val playlist = preferencesManager.getPlaylist().first()
         val currentIndex = preferencesManager.getCurrentIndex().first()
@@ -138,17 +230,23 @@ object StarSky {
         val playbackPosition = preferencesManager.getPlaybackPosition().first()
 
         if (playlist.isNotEmpty()) {
-            getPlayer().playPlaylist(playlist, currentIndex)
-            getPlayer().setPlayMode(playMode)
-            getPlayer().setVolume(volume)
-            getPlayer().setSpeed(speed)
-            getPlayer().seekTo(playbackPosition)
+            playerControl?.playPlaylist(playlist, currentIndex)
+            playerControl?.setPlayMode(playMode)
+            playerControl?.setVolume(volume)
+            playerControl?.setSpeed(speed)
+            playerControl?.seekTo(playbackPosition)
+            if (!config.autoPlay) {
+                playerControl?.pause()
+            }
         } else if (currentAudio != null) {
-            getPlayer().play(currentAudio)
-            getPlayer().setPlayMode(playMode)
-            getPlayer().setVolume(volume)
-            getPlayer().setSpeed(speed)
-            getPlayer().seekTo(playbackPosition)
+            playerControl?.play(currentAudio)
+            playerControl?.setPlayMode(playMode)
+            playerControl?.setVolume(volume)
+            playerControl?.setSpeed(speed)
+            playerControl?.seekTo(playbackPosition)
+            if (!config.autoPlay) {
+                playerControl?.pause()
+            }
         }
     }
 
@@ -157,7 +255,7 @@ object StarSky {
     }
 
     fun release() {
-        player?.release()
-        player = null
+        playerControl?.release()
+        playerControl = null
     }
 }

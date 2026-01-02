@@ -1,29 +1,26 @@
 package com.cycling.starskyaudio
 
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
 import android.os.Bundle
-import android.os.IBinder
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.lifecycleScope
 import com.cycling.starsky.StarSky
-import com.cycling.starsky.listener.OnPlayerEventListener
+import com.cycling.starsky.control.PlayerControl
 import com.cycling.starsky.model.AudioInfo
 import com.cycling.starsky.model.PlayMode
 import com.cycling.starsky.model.PlaybackState
-import com.cycling.starsky.service.StarSkyMediaSessionService
 import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
@@ -52,28 +49,11 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         
-        StarSky.init(this)
-        
         setContent {
             MaterialTheme {
                 PlayerScreen()
             }
         }
-
-        setupPlayerListener()
-    }
-
-    private fun setupPlayerListener() {
-        StarSky.addListener(object : OnPlayerEventListener {
-            override fun onPlaybackStateChanged(state: PlaybackState) {
-            }
-
-            override fun onAudioChanged(audioInfo: com.cycling.starsky.model.AudioInfo?) {
-            }
-
-            override fun onError(message: String, exception: Throwable?) {
-            }
-        })
     }
 
     override fun onDestroy() {
@@ -84,16 +64,24 @@ class MainActivity : ComponentActivity() {
     @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     fun PlayerScreen() {
+        val context = LocalContext.current
+        val playerControl = remember { StarSky.with(context) }
+        
         var playbackState by remember { mutableStateOf<PlaybackState>(PlaybackState.Idle) }
         var currentSong by remember { mutableStateOf("No song playing") }
         var playMode by remember { mutableStateOf(PlayMode.LOOP) }
         var currentPosition by remember { mutableLongStateOf(0L) }
         var duration by remember { mutableLongStateOf(0L) }
         var isPlaying by remember { mutableStateOf(false) }
+        var currentPlaylist by remember { mutableStateOf<List<AudioInfo>>(emptyList()) }
+        var currentIndex by remember { mutableStateOf(-1) }
+        var bufferedPosition by remember { mutableLongStateOf(0L) }
+        var isBuffering by remember { mutableStateOf(false) }
+        var networkError by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             lifecycleScope.launch {
-                StarSky.playbackState.collect { state ->
+                playerControl.playbackState.collect { state ->
                     playbackState = state
                 }
             }
@@ -101,7 +89,7 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             lifecycleScope.launch {
-                StarSky.currentAudio.collect { audio ->
+                playerControl.currentAudio.collect { audio ->
                     audio?.let {
                         currentSong = "${it.songName} - ${it.artist}"
                     }
@@ -111,7 +99,7 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             lifecycleScope.launch {
-                StarSky.playbackPosition.collect { position ->
+                playerControl.playbackPosition.collect { position ->
                     currentPosition = position
                 }
             }
@@ -119,7 +107,7 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             lifecycleScope.launch {
-                StarSky.playbackDuration.collect { dur ->
+                playerControl.playbackDuration.collect { dur ->
                     duration = dur
                 }
             }
@@ -127,8 +115,35 @@ class MainActivity : ComponentActivity() {
 
         LaunchedEffect(Unit) {
             lifecycleScope.launch {
-                StarSky.isPlaying.collect { playing ->
+                playerControl.isPlaying.collect { playing ->
                     isPlaying = playing
+                }
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            lifecycleScope.launch {
+                playerControl.currentPlaylist.collect { playlist ->
+                    currentPlaylist = playlist
+                }
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            lifecycleScope.launch {
+                playerControl.currentIndex.collect { index ->
+                    currentIndex = index
+                }
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            lifecycleScope.launch {
+                while (true) {
+                    kotlinx.coroutines.delay(500)
+                    bufferedPosition = playerControl.getBufferedPosition()
+                    isBuffering = playerControl.isBuffering()
+                    networkError = playerControl.hasNetworkError()
                 }
             }
         }
@@ -146,12 +161,24 @@ class MainActivity : ComponentActivity() {
                     .fillMaxSize()
                     .padding(paddingValues)
                     .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(
                     text = "State: $playbackState",
                     style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Text(
+                    text = if (networkError) "Network Error" else if (isBuffering) "Buffering..." else "Ready",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (networkError) MaterialTheme.colorScheme.error else if (isBuffering) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                Text(
+                    text = "Buffered: ${formatTime(bufferedPosition)}",
+                    style = MaterialTheme.typography.bodyMedium,
                     modifier = Modifier.padding(bottom = 16.dp)
                 )
 
@@ -161,11 +188,20 @@ class MainActivity : ComponentActivity() {
                     modifier = Modifier.padding(bottom = 24.dp)
                 )
 
+                Button(
+                    onClick = {
+                        playerControl.playPlaylist(audioList, 0)
+                    },
+                    modifier = Modifier.padding(bottom = 16.dp)
+                ) {
+                    Text("Play Playlist")
+                }
+
                 Slider(
                     value = if (duration > 0) currentPosition.toFloat() / duration.toFloat() else 0f,
                     onValueChange = { value ->
                         if (duration > 0) {
-                            StarSky.seekTo((value * duration).toLong())
+                            playerControl.seekTo((value * duration).toLong())
                         }
                     },
                     modifier = Modifier
@@ -186,47 +222,39 @@ class MainActivity : ComponentActivity() {
                     horizontalArrangement = Arrangement.SpaceEvenly
                 ) {
                     Button(
-                        onClick = { StarSky.previous() },
+                        onClick = { playerControl.previous() },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Previous")
                     }
-
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Button(
                         onClick = {
                             if (isPlaying) {
-                                StarSky.pause()
+                                playerControl.pause()
                             } else {
-                                StarSky.playPlaylist(audioList, 0)
-                                StarSky.enableNotification()
+                                playerControl.resume()
                             }
                         },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(if (isPlaying) "Pause" else "Play")
                     }
-
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Button(
-                        onClick = { StarSky.stop() },
+                        onClick = { playerControl.stop() },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Stop")
                     }
-
                     Spacer(modifier = Modifier.width(8.dp))
-
                     Button(
-                        onClick = { StarSky.next() },
+                        onClick = { playerControl.next() },
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Next")
                     }
                 }
-
                 Button(
                     onClick = {
                         val newMode = when (playMode) {
@@ -235,11 +263,160 @@ class MainActivity : ComponentActivity() {
                             PlayMode.SHUFFLE -> PlayMode.LOOP
                         }
                         playMode = newMode
-                        StarSky.setPlayMode(newMode)
+                        playerControl.setPlayMode(newMode)
                     },
-                    shape = RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.padding(bottom = 16.dp)
                 ) {
                     Text("Mode: $playMode")
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = {
+                            val newSong = AudioInfo(
+                                songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
+                                songName = "Song 4",
+                                artist = "Artist 4"
+                            )
+                            playerControl.addSongInfo(newSong)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Add Song")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            val newSong = AudioInfo(
+                                songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
+                                songName = "Song 5",
+                                artist = "Artist 5"
+                            )
+                            playerControl.addSongInfoAt(newSong, 0)
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Add at 0")
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = {
+                            val playlist = playerControl.getCurrentPlaylist()
+                            if (playlist.isNotEmpty()) {
+                                playerControl.removeSongInfo(playlist.size - 1)
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Remove Last")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            playerControl.clearPlaylist()
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Clear All")
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.SpaceEvenly
+                ) {
+                    Button(
+                        onClick = {
+                            val playlist = playerControl.getCurrentPlaylist()
+                            if (currentIndex >= 0 && currentIndex < playlist.size) {
+                                val currentSong = playlist[currentIndex]
+                                val isBuffering = playerControl.isCurrMusicIsBuffering(currentSong)
+                                android.util.Log.d("MainActivity", "Current song buffering: $isBuffering")
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Check Buffer")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Playlist (${currentPlaylist.size} songs)",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold),
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    itemsIndexed(currentPlaylist) { index, song ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = if (index == currentIndex) {
+                                    MaterialTheme.colorScheme.primaryContainer
+                                } else {
+                                    MaterialTheme.colorScheme.surface
+                                }
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "${index + 1}.",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(end = 8.dp)
+                                )
+                                Column(
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Text(
+                                        text = song.songName,
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = if (index == currentIndex) FontWeight.Bold else FontWeight.Normal
+                                        )
+                                    )
+                                    Text(
+                                        text = song.artist,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                if (index == currentIndex) {
+                                    Text(
+                                        text = "♪",
+                                        style = MaterialTheme.typography.titleLarge,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
