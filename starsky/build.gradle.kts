@@ -5,7 +5,7 @@ plugins {
     `maven-publish`
 }
 
-group = "com.github.cycling"
+group = "com.github.cycling02"
 version = "1.0.0"
 
 android {
@@ -87,7 +87,7 @@ afterEvaluate {
                 pom {
                     name.set("StarSkyAudio")
                     description.set("A powerful Android audio player library based on Media3")
-                    url.set("https://github.com/cycling/StarSkyAudio")
+                    url.set("https://github.com/cycling02/StarSkyAudio")
                     
                     licenses {
                         license {
