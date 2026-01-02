@@ -2,7 +2,11 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
+    `maven-publish`
 }
+
+group = "com.github.cycling"
+version = "1.0.0"
 
 android {
     namespace = "com.cycling.starsky"
@@ -68,4 +72,45 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test-jvm:1.9.0")
     testImplementation("org.jetbrains.kotlin:kotlin-test-junit:1.9.0")
+}
+
+afterEvaluate {
+    publishing {
+        publications {
+            create<MavenPublication>("release") {
+                from(components.findByName("release"))
+                
+                groupId = "com.github.cycling"
+                artifactId = "StarSkyAudio"
+                version = "1.0.0"
+                
+                pom {
+                    name.set("StarSkyAudio")
+                    description.set("A powerful Android audio player library based on Media3")
+                    url.set("https://github.com/cycling/StarSkyAudio")
+                    
+                    licenses {
+                        license {
+                            name.set("The Apache Software License, Version 2.0")
+                            url.set("http://www.apache.org/licenses/LICENSE-2.0.txt")
+                        }
+                    }
+                    
+                    developers {
+                        developer {
+                            id.set("cycling")
+                            name.set("Cycling")
+                            email.set("cycling@example.com")
+                        }
+                    }
+                    
+                    scm {
+                        connection.set("scm:git:github.com/cycling/StarSkyAudio.git")
+                        developerConnection.set("scm:git:ssh://github.com/cycling/StarSkyAudio.git")
+                        url.set("https://github.com/cycling/StarSkyAudio")
+                    }
+                }
+            }
+        }
+    }
 }

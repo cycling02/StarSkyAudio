@@ -2,6 +2,45 @@
 
 基于 AndroidX Media3 的音频播放库，提供简单易用的音频播放功能。
 
+## 安装
+
+### 通过 JitPack 集成
+
+#### Step 1. 添加 JitPack 仓库
+
+在项目的 `settings.gradle.kts` 文件中添加 JitPack 仓库：
+
+```kotlin
+dependencyResolutionManagement {
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
+    repositories {
+        google()
+        mavenCentral()
+        maven { url = uri("https://jitpack.io") }
+    }
+}
+```
+
+#### Step 2. 添加依赖
+
+在模块的 `build.gradle.kts` 文件中添加依赖：
+
+```kotlin
+dependencies {
+    implementation("com.github.cycling:StarSkyAudio:1.0.0")
+}
+```
+
+#### Step 3. 添加必要的权限
+
+在 `AndroidManifest.xml` 中添加必要的权限：
+
+```xml
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+<uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+```
+
 ## 功能特性
 
 ### 核心播放功能
@@ -70,7 +109,52 @@
 
 ### 初始化
 
-在 Application 或 MainActivity 中初始化播放器，设置缓存、通知、自动播放和状态恢复等配置。
+在 Application 类中初始化播放器：
+
+```kotlin
+class MyApplication : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        
+        StarSky.init(this)
+            .setOpenCache(true)              // 启用缓存
+            .setNotificationEnabled(true)    // 启用通知
+            .setAutoPlay(false)              // 不自动播放
+            .setRestoreState(true)           // 恢复播放状态
+            .apply()
+    }
+}
+```
+
+### Service 配置
+
+StarSky 提供了灵活的 Service 配置选项：
+
+```kotlin
+val config = StarSkyConfig.Builder()
+    .setConnService(true)  // 是否需要后台服务（默认 true）
+    .setStartService(true)  // 是否需要 startService（默认 false）
+    .setOnlyStartService(false)  // 是否只是 startService 而不需要 startForegroundService（默认 true）
+    .setConnServiceListener(object : ConnServiceListener {
+        override fun onServiceConnected() {
+            // Service 连接成功回调
+        }
+        override fun onServiceDisconnected() {
+            // Service 断开连接回调
+        }
+    })
+    .setStartForegroundByWorkManager(false)  // 是否使用 WorkManager 启动后台服务（默认 false）
+    .build()
+
+val playerControl = PlayerControlImpl(context, config)
+```
+
+**配置说明：**
+- `connService`: 是否需要后台服务，默认 true。如果设置为 false，所有逻辑不经过 Service
+- `isStartService`: 是否需要 startService，默认 false。false 的话只有 bindService
+- `onlyStartService`: 是否只是 startService 而不需要 startForegroundService，默认 true
+- `connServiceListener`: 连接服务回调，可通过这个监听查看 Service 是否连接成功
+- `startForegroundByWorkManager`: 开关，可选择是否使用 WorkManager 来启动安卓 12 的后台服务，默认关闭
 
 ### 播放单首音频
 
@@ -163,6 +247,38 @@ starsky/
 - 不再使用时调用释放方法释放资源
 - 网络错误检测采用智能防抖机制，缓冲超过 3 秒且无进度变化时才判定为网络错误
 - 缓存使用 LRU 策略，默认最大缓存大小为 512MB
+
+## 版本历史
+
+### 1.0.0
+- 基于 AndroidX Media3 的完整音频播放功能
+- 支持单首音频和播放列表播放
+- 完整的播放控制功能
+- 多种播放模式支持
+- 音量和速度控制
+- 队列管理功能
+- 缓存状态监控
+- 状态监听和 StateFlow 支持
+- 系统通知和媒体会话集成
+- 缓存管理（LRU 策略）
+- 播放状态持久化
+- 灵活的 Service 配置
+- Service 连接监听器
+
+## 发布说明
+
+本项目通过 JitPack 发布，版本格式为：`com.github.cycling:StarSkyAudio:1.0.0`
+
+### 发布新版本
+
+1. 更新 `starsky/build.gradle.kts` 中的版本号
+2. 创建并推送 Git tag：
+   ```bash
+   git tag -a v1.0.0 -m "Release version 1.0.0"
+   git push origin v1.0.0
+   ```
+3. 在 [JitPack](https://jitpack.io/) 上查看构建状态
+4. 构建成功后即可使用新版本
 
 ## 许可证
 
