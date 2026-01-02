@@ -13,7 +13,7 @@ import kotlinx.coroutines.flow.StateFlow
 @androidx.media3.common.util.UnstableApi
 class PlayerControlImpl(private val context: Context, private val config: StarSkyConfig = StarSkyConfig()) : PlayerControl {
 
-    private val player: StarSkyPlayer by lazy { StarSkyPlayer(context) }
+    private val player: StarSkyPlayer by lazy { StarSkyPlayer(context, config) }
 
     override fun play(audioInfo: AudioInfo) {
         player.play(audioInfo)

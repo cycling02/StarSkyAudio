@@ -13,6 +13,8 @@ import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.session.MediaSession
 import com.cycling.starsky.cache.StarSkyCacheManager
+import com.cycling.starsky.config.StarSkyConfig
+import com.cycling.starsky.listener.ConnServiceListener
 import com.cycling.starsky.listener.OnPlayerEventListener
 import com.cycling.starsky.model.AudioInfo
 import com.cycling.starsky.model.PlayMode
@@ -26,7 +28,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
 @androidx.media3.common.util.UnstableApi
-class StarSkyPlayer(private val context: Context) {
+class StarSkyPlayer(private val context: Context, private val config: StarSkyConfig = StarSkyConfig()) {
 
     private val cacheManager = StarSkyCacheManager.getInstance(context)
     private val preferencesManager = StarSkyPreferencesManager(context)
@@ -49,17 +51,23 @@ class StarSkyPlayer(private val context: Context) {
 
     private var mediaSession: MediaSession? = null
 
+    private var isServiceBound = false
+
     private val serviceConnection = object : ServiceConnection {
         override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
             val binder = service as? StarSkyMediaSessionService.LocalBinder
             binder?.getService()?.let { sessionService ->
                 mediaSession = sessionService.getMediaSession()
                 sessionService.setPlayer(exoPlayer)
+                isServiceBound = true
+                config.connServiceListener?.onServiceConnected()
             }
         }
 
         override fun onServiceDisconnected(name: ComponentName?) {
             mediaSession = null
+            isServiceBound = false
+            config.connServiceListener?.onServiceDisconnected()
         }
     }
 
@@ -426,12 +434,35 @@ class StarSkyPlayer(private val context: Context) {
     }
 
     fun enableNotification() {
+        if (!config.connService) {
+            return
+        }
+
         val intent = Intent(context, StarSkyMediaSessionService::class.java)
+
+        if (config.isStartService) {
+            if (config.onlyStartService) {
+                context.startService(intent)
+            } else {
+                context.startForegroundService(intent)
+            }
+        }
+
         context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
     }
 
     fun disableNotification() {
-        context.unbindService(serviceConnection)
+        if (!config.connService) {
+            return
+        }
+
+        if (isServiceBound) {
+            context.unbindService(serviceConnection)
+        }
+
+        if (config.isStartService) {
+            context.stopService(Intent(context, StarSkyMediaSessionService::class.java))
+        }
     }
 
     fun release() {
