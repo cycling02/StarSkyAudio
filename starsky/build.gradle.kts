@@ -6,7 +6,7 @@ plugins {
 }
 
 group = "com.github.cycling02"
-version = "1.0.0"
+version = "1.1.0"
 
 android {
     namespace = "com.cycling.starsky"
@@ -82,7 +82,7 @@ afterEvaluate {
                 
                 groupId = "com.github.cycling02"
                 artifactId = "StarSkyAudio"
-                version = "1.0.0"
+                version = "1.1.0"
                 
                 pom {
                     name.set("StarSkyAudio")

@@ -29,7 +29,7 @@ dependencyResolutionManagement {
 
 ```kotlin
 dependencies {
-    implementation("com.github.cycling02:StarSkyAudio:1.0.0")
+    implementation("com.github.cycling02:StarSkyAudio:1.1.0")
 }
 ```
 
@@ -810,6 +810,12 @@ starsky/
 
 ## 版本历史
 
+### 1.1.0
+- 添加完整的 API 文档
+- 添加详细的使用示例（传统 View 和 Jetpack Compose）
+- 优化 JitPack 发布配置，只发布库模块
+- 改进 README 文档结构
+
 ### 1.0.0
 - 基于 AndroidX Media3 的完整音频播放功能
 - 支持单首音频和播放列表播放
@@ -827,15 +833,15 @@ starsky/
 
 ## 发布说明
 
-本项目通过 JitPack 发布，版本格式为：`com.github.cycling02:StarSkyAudio:1.0.0`
+本项目通过 JitPack 发布，版本格式为：`com.github.cycling02:StarSkyAudio:1.1.0`
 
 ### 发布新版本
 
 1. 更新 `starsky/build.gradle.kts` 中的版本号
 2. 创建并推送 Git tag：
    ```bash
-   git tag -a v1.0.0 -m "Release version 1.0.0"
-   git push origin v1.0.0
+   git tag -a v1.1.0 -m "Release version 1.1.0"
+   git push origin v1.1.0
    ```
 3. 在 [JitPack](https://jitpack.io/) 上查看构建状态
 4. 构建成功后即可使用新版本
