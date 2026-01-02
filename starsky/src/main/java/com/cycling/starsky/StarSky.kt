@@ -1,6 +1,7 @@
 package com.cycling.starsky
 
 import android.content.Context
+import androidx.media3.common.util.UnstableApi
 import com.cycling.starsky.cache.StarSkyCacheManager
 import com.cycling.starsky.config.StarSkyConfig
 import com.cycling.starsky.listener.OnPlayerEventListener
@@ -17,6 +18,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 
+@androidx.media3.common.util.UnstableApi
 object StarSky {
 
     private var playerControl: PlayerControl? = null

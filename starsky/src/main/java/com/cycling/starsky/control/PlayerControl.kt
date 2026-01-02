@@ -10,6 +10,24 @@ import kotlinx.coroutines.flow.StateFlow
 
 interface PlayerControl {
 
+    val playbackState: StateFlow<PlaybackState>
+
+    val currentAudio: StateFlow<AudioInfo?>
+
+    val playMode: StateFlow<PlayMode>
+
+    val playbackPosition: StateFlow<Long>
+
+    val playbackDuration: StateFlow<Long>
+
+    val isPlaying: StateFlow<Boolean>
+
+    val currentPlaylist: StateFlow<List<AudioInfo>>
+
+    val currentIndex: StateFlow<Int>
+
+    val playHistory: StateFlow<List<AudioInfo>>
+
     fun play(audioInfo: AudioInfo)
 
     fun playPlaylist(audioList: List<AudioInfo>, startIndex: Int = 0)
@@ -61,24 +79,6 @@ interface PlayerControl {
     fun getPlayHistory(): List<AudioInfo>
 
     fun clearPlayHistory()
-
-    val playbackState: StateFlow<PlaybackState>
-
-    val currentAudio: StateFlow<AudioInfo?>
-
-    val playMode: StateFlow<PlayMode>
-
-    val playbackPosition: StateFlow<Long>
-
-    val playbackDuration: StateFlow<Long>
-
-    val isPlaying: StateFlow<Boolean>
-
-    val currentPlaylist: StateFlow<List<AudioInfo>>
-
-    val currentIndex: StateFlow<Int>
-
-    val playHistory: StateFlow<List<AudioInfo>>
 
     fun addListener(listener: OnPlayerEventListener)
 

@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -14,7 +13,7 @@ import androidx.media3.session.MediaSession
 import androidx.media3.ui.PlayerNotificationManager
 import com.cycling.starsky.R
 
-@OptIn(UnstableApi::class)
+@androidx.media3.common.util.UnstableApi
 class StarSkyNotificationManager(
     private val context: Context,
     private val player: Player,
@@ -54,33 +53,34 @@ class StarSkyNotificationManager(
     }
 
     private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Music playback controls"
-                setShowBadge(false)
-                setSound(null, null)
-            }
-
-            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Music playback controls"
+            setShowBadge(false)
+            setSound(null, null)
         }
+
+        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
     }
 
     private class DescriptionAdapter(private val context: Context) :
         PlayerNotificationManager.MediaDescriptionAdapter {
 
+        @androidx.media3.common.util.UnstableApi
         override fun getCurrentContentTitle(player: Player): CharSequence {
             return player.currentMediaItem?.mediaMetadata?.title ?: "Unknown"
         }
 
+        @androidx.media3.common.util.UnstableApi
         override fun getCurrentContentText(player: Player): CharSequence? {
             return player.currentMediaItem?.mediaMetadata?.artist
         }
 
+        @androidx.media3.common.util.UnstableApi
         override fun getCurrentLargeIcon(
             player: Player,
             callback: PlayerNotificationManager.BitmapCallback
@@ -88,6 +88,7 @@ class StarSkyNotificationManager(
             return null
         }
 
+        @androidx.media3.common.util.UnstableApi
         override fun createCurrentContentIntent(player: Player): PendingIntent? {
             val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
             return PendingIntent.getActivity(
@@ -100,9 +101,11 @@ class StarSkyNotificationManager(
     }
 
     private class NotificationListener : PlayerNotificationManager.NotificationListener {
+        @OptIn(UnstableApi::class)
         override fun onNotificationCancelled(notificationId: Int, dismissedByUser: Boolean) {
         }
 
+        @OptIn(UnstableApi::class)
         override fun onNotificationPosted(notificationId: Int, notification: Notification, ongoing: Boolean) {
         }
     }

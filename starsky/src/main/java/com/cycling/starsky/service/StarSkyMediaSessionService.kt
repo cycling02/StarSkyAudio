@@ -7,7 +7,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.media3.common.Player
@@ -17,6 +16,7 @@ import androidx.media3.ui.PlayerNotificationManager
 import com.cycling.starsky.R
 import com.cycling.starsky.notification.StarSkyNotificationManager
 
+@androidx.media3.common.util.UnstableApi
 class StarSkyMediaSessionService : MediaSessionService() {
 
     private var mediaSession: MediaSession? = null
@@ -39,20 +39,18 @@ class StarSkyMediaSessionService : MediaSessionService() {
     }
 
     private fun startForegroundService() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                CHANNEL_NAME,
-                NotificationManager.IMPORTANCE_DEFAULT
-            ).apply {
-                description = "Music playback controls"
-                setShowBadge(false)
-                setSound(null, null)
-            }
-
-            val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.createNotificationChannel(channel)
+        val channel = NotificationChannel(
+            CHANNEL_ID,
+            CHANNEL_NAME,
+            NotificationManager.IMPORTANCE_DEFAULT
+        ).apply {
+            description = "Music playback controls"
+            setShowBadge(false)
+            setSound(null, null)
         }
+
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("StarSky Player")

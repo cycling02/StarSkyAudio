@@ -10,6 +10,7 @@ import com.cycling.starsky.player.StarSkyPlayer
 import androidx.media3.common.Player
 import kotlinx.coroutines.flow.StateFlow
 
+@androidx.media3.common.util.UnstableApi
 class PlayerControlImpl(private val context: Context, private val config: StarSkyConfig = StarSkyConfig()) : PlayerControl {
 
     private val player: StarSkyPlayer by lazy { StarSkyPlayer(context) }
