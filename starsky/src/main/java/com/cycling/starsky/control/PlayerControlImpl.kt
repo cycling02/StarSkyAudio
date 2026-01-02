@@ -110,6 +110,14 @@ class PlayerControlImpl(private val context: Context, private val config: StarSk
         return player.hasNetworkError()
     }
 
+    override fun getPlayHistory(): List<AudioInfo> {
+        return player.getPlayHistory()
+    }
+
+    override fun clearPlayHistory() {
+        player.clearPlayHistory()
+    }
+
     override val playbackState: StateFlow<PlaybackState>
         get() = player.playbackState
 
@@ -133,6 +141,9 @@ class PlayerControlImpl(private val context: Context, private val config: StarSk
 
     override val currentIndex: StateFlow<Int>
         get() = player.currentIndex
+
+    override val playHistory: StateFlow<List<AudioInfo>>
+        get() = player.playHistory
 
     override fun addListener(listener: OnPlayerEventListener) {
         player.addListener(listener)

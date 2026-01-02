@@ -27,16 +27,19 @@ class MainActivity : ComponentActivity() {
 
     private val audioList = listOf(
         AudioInfo(
+            songId = "song_1",
             songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3",
             songName = "Song 1",
             artist = "Artist 1"
         ),
         AudioInfo(
+            songId = "song_2",
             songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3",
             songName = "Song 2",
             artist = "Artist 2"
         ),
         AudioInfo(
+            songId = "song_3",
             songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3",
             songName = "Song 3",
             artist = "Artist 3"
@@ -78,6 +81,8 @@ class MainActivity : ComponentActivity() {
         var bufferedPosition by remember { mutableLongStateOf(0L) }
         var isBuffering by remember { mutableStateOf(false) }
         var networkError by remember { mutableStateOf(false) }
+        var playHistory by remember { mutableStateOf<List<AudioInfo>>(emptyList()) }
+        var showHistory by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
             lifecycleScope.launch {
@@ -144,6 +149,14 @@ class MainActivity : ComponentActivity() {
                     bufferedPosition = playerControl.getBufferedPosition()
                     isBuffering = playerControl.isBuffering()
                     networkError = playerControl.hasNetworkError()
+                }
+            }
+        }
+
+        LaunchedEffect(Unit) {
+            lifecycleScope.launch {
+                StarSky.playHistory.collect { history ->
+                    playHistory = history
                 }
             }
         }
@@ -260,7 +273,8 @@ class MainActivity : ComponentActivity() {
                         val newMode = when (playMode) {
                             PlayMode.LOOP -> PlayMode.SINGLE_LOOP
                             PlayMode.SINGLE_LOOP -> PlayMode.SHUFFLE
-                            PlayMode.SHUFFLE -> PlayMode.LOOP
+                            PlayMode.SHUFFLE -> PlayMode.NO_LOOP
+                            PlayMode.NO_LOOP -> PlayMode.LOOP
                         }
                         playMode = newMode
                         playerControl.setPlayMode(newMode)
@@ -280,6 +294,7 @@ class MainActivity : ComponentActivity() {
                     Button(
                         onClick = {
                             val newSong = AudioInfo(
+                                songId = "song_4",
                                 songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3",
                                 songName = "Song 4",
                                 artist = "Artist 4"
@@ -294,6 +309,7 @@ class MainActivity : ComponentActivity() {
                     Button(
                         onClick = {
                             val newSong = AudioInfo(
+                                songId = "song_5",
                                 songUrl = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3",
                                 songName = "Song 5",
                                 artist = "Artist 5"
@@ -352,6 +368,15 @@ class MainActivity : ComponentActivity() {
                         modifier = Modifier.weight(1f)
                     ) {
                         Text("Check Buffer")
+                    }
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            showHistory = true
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("History (${playHistory.size})")
                     }
                 }
 
@@ -419,6 +444,75 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
+        }
+
+        if (showHistory) {
+            AlertDialog(
+                onDismissRequest = { showHistory = false },
+                title = { Text("Play History (${playHistory.size})") },
+                text = {
+                    LazyColumn(
+                        modifier = Modifier.height(400.dp)
+                    ) {
+                        itemsIndexed(playHistory) { index, song ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(
+                                        text = "${index + 1}.",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        modifier = Modifier.padding(end = 8.dp)
+                                    )
+                                    Column(
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Text(
+                                            text = song.songName,
+                                            style = MaterialTheme.typography.bodyMedium
+                                        )
+                                        Text(
+                                            text = song.artist,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                        if (playHistory.isEmpty()) {
+                            item {
+                                Text(
+                                    text = "No play history yet",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    modifier = Modifier.padding(16.dp)
+                                )
+                            }
+                        }
+                    }
+                },
+                confirmButton = {
+                    Button(onClick = { showHistory = false }) {
+                        Text("Close")
+                    }
+                },
+                dismissButton = {
+                    if (playHistory.isNotEmpty()) {
+                        Button(onClick = {
+                            StarSky.clearPlayHistory()
+                        }) {
+                            Text("Clear")
+                        }
+                    }
+                }
+            )
         }
     }
 

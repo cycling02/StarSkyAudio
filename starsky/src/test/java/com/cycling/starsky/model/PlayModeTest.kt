@@ -21,11 +21,17 @@ class PlayModeTest {
     }
 
     @Test
+    fun testPlayModeNoLoop() {
+        assertEquals("NO_LOOP", PlayMode.NO_LOOP.name)
+    }
+
+    @Test
     fun testPlayModeValues() {
         val modes = PlayMode.values()
-        assertEquals(3, modes.size)
+        assertEquals(4, modes.size)
         assertTrue(modes.contains(PlayMode.LOOP))
         assertTrue(modes.contains(PlayMode.SINGLE_LOOP))
         assertTrue(modes.contains(PlayMode.SHUFFLE))
+        assertTrue(modes.contains(PlayMode.NO_LOOP))
     }
 }

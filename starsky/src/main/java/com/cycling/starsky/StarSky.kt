@@ -181,11 +181,20 @@ object StarSky {
     val currentIndex: StateFlow<Int>
         get() = playerControl?.currentIndex ?: throw IllegalStateException("StarSky not initialized")
 
+    val playHistory: StateFlow<List<AudioInfo>>
+        get() = playerControl?.playHistory ?: throw IllegalStateException("StarSky not initialized")
+
     fun getExoPlayer() = playerControl?.getExoPlayer() ?: throw IllegalStateException("StarSky not initialized")
 
     fun getCurrentPlaylist() = playerControl?.getCurrentPlaylist() ?: emptyList()
 
     fun getCurrentIndex() = playerControl?.getCurrentIndex() ?: -1
+
+    fun getPlayHistory() = playerControl?.getPlayHistory() ?: emptyList()
+
+    fun clearPlayHistory() {
+        playerControl?.clearPlayHistory()
+    }
 
     fun getBufferedPosition() = playerControl?.getBufferedPosition() ?: 0L
 

@@ -4,6 +4,10 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
+import android.os.Build
 import android.os.IBinder
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
@@ -31,6 +35,54 @@ class StarSkyPlayer(private val context: Context) {
 
     private val cacheManager = StarSkyCacheManager.getInstance(context)
     private val preferencesManager = StarSkyPreferencesManager(context)
+
+    private val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
+
+    private val audioAttributes = AudioAttributes.Builder()
+        .setUsage(AudioAttributes.USAGE_MEDIA)
+        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+        .build()
+
+    private val audioFocusChangeListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
+        when (focusChange) {
+            AudioManager.AUDIOFOCUS_GAIN -> {
+                if (exoPlayer.playbackState == Player.STATE_IDLE || 
+                    exoPlayer.playbackState == Player.STATE_ENDED) {
+                    return@OnAudioFocusChangeListener
+                }
+                exoPlayer.volume = 1f
+                if (wasPlayingWhenLostFocus) {
+                    exoPlayer.play()
+                    wasPlayingWhenLostFocus = false
+                }
+            }
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                wasPlayingWhenLostFocus = exoPlayer.playWhenReady
+                exoPlayer.pause()
+                abandonAudioFocus()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                wasPlayingWhenLostFocus = exoPlayer.playWhenReady
+                exoPlayer.pause()
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
+                exoPlayer.volume = 0.3f
+            }
+        }
+    }
+
+    private val audioFocusRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setAudioAttributes(audioAttributes)
+            .setAcceptsDelayedFocusGain(true)
+            .setOnAudioFocusChangeListener(audioFocusChangeListener)
+            .build()
+    } else {
+        null
+    }
+
+    private var wasPlayingWhenLostFocus = false
+    private var hasAudioFocus = false
 
     private var exoPlayer: ExoPlayer = createPlayer()
 
@@ -70,8 +122,13 @@ class StarSkyPlayer(private val context: Context) {
     private val _currentIndexFlow = MutableStateFlow(-1)
     val currentIndex: StateFlow<Int> = _currentIndexFlow.asStateFlow()
 
+    private val _playHistory = MutableStateFlow<List<AudioInfo>>(emptyList())
+    val playHistory: StateFlow<List<AudioInfo>> = _playHistory.asStateFlow()
+
     private val playlist = mutableListOf<AudioInfo>()
     private var currentSongIndex = -1
+    private val playedIndices = mutableSetOf<Int>()
+    private val playHistoryList = mutableListOf<AudioInfo>()
 
     private val playerScope = CoroutineScope(Dispatchers.Main + Job())
     private var positionUpdateJob: Job? = null
@@ -125,6 +182,13 @@ class StarSkyPlayer(private val context: Context) {
             _playbackState.value = state
             _isPlaying.value = currentIsPlaying
             notifyPlaybackStateChanged(state)
+
+            if (currentPlaybackState == Player.STATE_ENDED) {
+                playerScope.launch {
+                    delay(500)
+                    next()
+                }
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
@@ -138,6 +202,7 @@ class StarSkyPlayer(private val context: Context) {
                     coverUrl = it.mediaMetadata.artworkUri?.toString() ?: ""
                 )
                 _currentAudio.value = audioInfo
+                addToPlayHistory(audioInfo)
                 notifyAudioChanged(audioInfo)
             }
         }
@@ -152,9 +217,35 @@ class StarSkyPlayer(private val context: Context) {
     init {
         exoPlayer.addListener(playerListener)
         startPositionUpdate()
+        loadPlayHistory()
+    }
+
+    private fun loadPlayHistory() {
+        playerScope.launch {
+            preferencesManager.getPlayHistory().collect { history ->
+                playHistoryList.clear()
+                playHistoryList.addAll(history)
+                _playHistory.value = playHistoryList.toList()
+            }
+        }
+    }
+
+    private fun addToPlayHistory(audioInfo: AudioInfo) {
+        playHistoryList.removeIf { it.songId == audioInfo.songId }
+        playHistoryList.add(0, audioInfo)
+        if (playHistoryList.size > 100) {
+            playHistoryList.removeAt(playHistoryList.size - 1)
+        }
+        _playHistory.value = playHistoryList.toList()
+
+        playerScope.launch {
+            preferencesManager.savePlayHistory(playHistoryList)
+        }
     }
 
     fun play(audioInfo: AudioInfo) {
+        requestAudioFocus()
+
         val mediaItem = MediaItem.Builder()
             .setUri(audioInfo.songUrl)
             .setMediaId(audioInfo.songId)
@@ -173,6 +264,7 @@ class StarSkyPlayer(private val context: Context) {
         exoPlayer.play()
 
         _currentAudio.value = audioInfo
+        addToPlayHistory(audioInfo)
 
         playerScope.launch {
             preferencesManager.saveCurrentAudio(audioInfo)
@@ -180,13 +272,16 @@ class StarSkyPlayer(private val context: Context) {
     }
 
     fun playPlaylist(audioList: List<AudioInfo>, startIndex: Int = 0) {
+        requestAudioFocus()
+
         playlist.clear()
-        playlist.addAll(audioList)
-        currentSongIndex = startIndex
+        val uniqueAudioList = audioList.distinctBy { it.songId }
+        playlist.addAll(uniqueAudioList)
+        currentSongIndex = startIndex.coerceAtMost(uniqueAudioList.size - 1)
         _currentPlaylist.value = playlist.toList()
         _currentIndexFlow.value = currentSongIndex
 
-        val mediaItems = audioList.map { audio ->
+        val mediaItems = uniqueAudioList.map { audio ->
             MediaItem.Builder()
                 .setUri(audio.songUrl)
                 .setMediaId(audio.songId)
@@ -201,20 +296,25 @@ class StarSkyPlayer(private val context: Context) {
                 .build()
         }
 
-        exoPlayer.setMediaItems(mediaItems, startIndex, 0L)
+        exoPlayer.setMediaItems(mediaItems, currentSongIndex, 0L)
         exoPlayer.prepare()
         exoPlayer.play()
 
-        _currentAudio.value = audioList.getOrNull(startIndex)
+        _currentAudio.value = uniqueAudioList.getOrNull(currentSongIndex)
+        uniqueAudioList.getOrNull(currentSongIndex)?.let { addToPlayHistory(it) }
 
         playerScope.launch {
-            preferencesManager.savePlaylist(audioList)
-            preferencesManager.saveCurrentIndex(startIndex)
-            preferencesManager.saveCurrentAudio(audioList.getOrNull(startIndex))
+            preferencesManager.savePlaylist(playlist)
+            preferencesManager.saveCurrentIndex(currentSongIndex)
+            preferencesManager.saveCurrentAudio(uniqueAudioList.getOrNull(currentSongIndex))
         }
     }
 
     fun addSongInfo(audioInfo: AudioInfo) {
+        if (playlist.any { it.songId == audioInfo.songId }) {
+            return
+        }
+
         playlist.add(audioInfo)
 
         val mediaItem = MediaItem.Builder()
@@ -242,6 +342,10 @@ class StarSkyPlayer(private val context: Context) {
     fun addSongInfoAt(audioInfo: AudioInfo, index: Int) {
         if (index < 0 || index > playlist.size) {
             throw IndexOutOfBoundsException("Index $index is out of bounds for playlist size ${playlist.size}")
+        }
+
+        if (playlist.any { it.songId == audioInfo.songId }) {
+            return
         }
 
         playlist.add(index, audioInfo)
@@ -342,7 +446,22 @@ class StarSkyPlayer(private val context: Context) {
 
         when (_playMode.value) {
             PlayMode.SHUFFLE -> {
-                currentSongIndex = playlist.indices.random()
+                val availableIndices = playlist.indices.filter { it !in playedIndices }
+                if (availableIndices.isEmpty()) {
+                    playedIndices.clear()
+                    currentSongIndex = playlist.indices.random()
+                } else {
+                    currentSongIndex = availableIndices.random()
+                }
+                playedIndices.add(currentSongIndex)
+            }
+            PlayMode.NO_LOOP -> {
+                if (currentSongIndex < playlist.size - 1) {
+                    currentSongIndex++
+                } else {
+                    stop()
+                    return
+                }
             }
             else -> {
                 currentSongIndex = (currentSongIndex + 1) % playlist.size
@@ -377,6 +496,7 @@ class StarSkyPlayer(private val context: Context) {
             PlayMode.LOOP -> Player.REPEAT_MODE_ALL
             PlayMode.SINGLE_LOOP -> Player.REPEAT_MODE_ONE
             PlayMode.SHUFFLE -> Player.REPEAT_MODE_ALL
+            PlayMode.NO_LOOP -> Player.REPEAT_MODE_OFF
         }
         notifyPlayModeChanged(mode)
 
@@ -420,6 +540,17 @@ class StarSkyPlayer(private val context: Context) {
     }
 
     fun hasNetworkError(): Boolean = networkError
+
+    fun getPlayHistory(): List<AudioInfo> = playHistoryList.toList()
+
+    fun clearPlayHistory() {
+        playHistoryList.clear()
+        _playHistory.value = emptyList()
+
+        playerScope.launch {
+            preferencesManager.savePlayHistory(emptyList())
+        }
+    }
 
     fun addListener(listener: OnPlayerEventListener) {
         listeners.add(listener)
@@ -502,9 +633,45 @@ class StarSkyPlayer(private val context: Context) {
     }
 
     fun release() {
+        abandonAudioFocus()
         positionUpdateJob?.cancel()
         exoPlayer.removeListener(playerListener)
         exoPlayer.release()
         disableNotification()
+    }
+
+    private fun requestAudioFocus(): Boolean {
+        if (hasAudioFocus) {
+            return true
+        }
+
+        val result = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioManager.requestAudioFocus(audioFocusRequest!!)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.requestAudioFocus(
+                audioFocusChangeListener,
+                AudioManager.STREAM_MUSIC,
+                AudioManager.AUDIOFOCUS_GAIN
+            )
+        }
+
+        hasAudioFocus = result == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        return hasAudioFocus
+    }
+
+    private fun abandonAudioFocus() {
+        if (!hasAudioFocus) {
+            return
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            audioManager.abandonAudioFocusRequest(audioFocusRequest!!)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusChangeListener)
+        }
+
+        hasAudioFocus = false
     }
 }

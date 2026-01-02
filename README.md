@@ -26,12 +26,28 @@
 - 音量调节 (0.0 - 1.0)
 - 播放速度调节 (0.5x - 2.0x)
 
+### 队列管理
+- 添加歌曲到播放列表末尾
+- 在指定位置插入歌曲
+- 删除指定位置的歌曲
+- 清空播放列表
+- 获取当前播放列表
+- 获取当前播放索引
+
+### 缓存状态监控
+- 获取当前缓存位置（毫秒）
+- 检查是否正在缓冲
+- 检查指定歌曲是否正在缓冲
+- 网络错误检测（智能防抖）
+
 ### 状态监听
 - 播放状态监听 (Idle, Buffering, Playing, Paused, Completed, Stopped, Error)
 - 当前音频信息监听
 - 播放进度监听
 - 播放模式监听
 - 错误监听
+- 播放列表变化监听
+- 当前播放索引监听
 
 ### 通知功能
 - 系统通知栏显示播放信息
@@ -42,6 +58,7 @@
 - 自动缓存已播放的音频
 - 缓存大小查询
 - 缓存清理
+- LRU 缓存策略（默认 512MB）
 
 ### 播放状态持久化
 - 自动保存播放状态（音频信息、播放列表、播放位置）
@@ -53,201 +70,64 @@
 
 ### 初始化
 
-```kotlin
-// 在 Application 或 MainActivity 中初始化
-StarSky.init(context)
-```
+在 Application 或 MainActivity 中初始化播放器，设置缓存、通知、自动播放和状态恢复等配置。
 
 ### 播放单首音频
 
-```kotlin
-val audioInfo = AudioInfo(
-    songId = "1",
-    songUrl = "https://example.com/audio.mp3",
-    songName = "歌曲名称",
-    artist = "艺术家",
-    albumName = "专辑名称",
-    coverUrl = "https://example.com/cover.jpg"
-)
-
-StarSky.play(audioInfo)
-```
+创建 AudioInfo 对象，包含歌曲 ID、URL、名称、艺术家、专辑和封面等信息，然后调用播放方法。
 
 ### 播放播放列表
 
-```kotlin
-val audioList = listOf(
-    AudioInfo(...),
-    AudioInfo(...),
-    AudioInfo(...)
-)
-
-StarSky.playPlaylist(audioList, startIndex = 0)
-```
+创建 AudioInfo 列表，指定起始索引，调用播放列表方法。
 
 ### 播放控制
 
-```kotlin
-// 播放/暂停
-StarSky.pause()
-StarSky.resume()
-
-// 停止
-StarSky.stop()
-
-// 跳转
-StarSky.seekTo(30000) // 跳转到 30 秒
-
-// 上一首/下一首
-StarSky.next()
-StarSky.previous()
-
-// 获取当前播放列表
-val playlist = StarSky.getCurrentPlaylist()
-
-// 获取当前播放索引
-val currentIndex = StarSky.getCurrentIndex()
-
-// 获取底层 ExoPlayer 实例（高级用法）
-val exoPlayer = StarSky.getExoPlayer()
-```
+提供播放、暂停、停止、跳转、上一首、下一首等控制方法。可以获取当前播放列表和播放索引，也可以获取底层 ExoPlayer 实例进行高级操作。
 
 ### 播放模式
 
-```kotlin
-// 列表循环
-StarSky.setPlayMode(PlayMode.LOOP)
-
-// 单曲循环
-StarSky.setPlayMode(PlayMode.SINGLE_LOOP)
-
-// 随机播放
-StarSky.setPlayMode(PlayMode.SHUFFLE)
-```
+支持三种播放模式：列表循环、单曲循环和随机播放，可通过相应方法切换。
 
 ### 音量和速度控制
 
-```kotlin
-// 音量 (0.0 - 1.0)
-StarSky.setVolume(0.8f)
-val volume = StarSky.getVolume()
+支持音量调节（0.0 - 1.0）和播放速度调节（0.5x - 2.0x），提供获取和设置方法。
 
-// 播放速度 (0.5x - 2.0x)
-StarSky.setSpeed(1.5f)
-val speed = StarSky.getSpeed()
-```
+### 队列管理
+
+提供完整的队列管理功能：
+- 添加歌曲到列表末尾
+- 在指定位置插入歌曲
+- 删除指定索引的歌曲
+- 清空整个播放列表
+- 获取当前播放列表和播放索引
+
+### 缓存状态监控
+
+提供实时缓存状态监控功能：
+- 获取当前已缓存到的位置（毫秒）
+- 检查播放器是否正在缓冲
+- 检查指定歌曲是否正在缓冲
+- 检测网络错误（智能防抖，缓冲超过 3 秒且无进度变化时判定为网络错误）
 
 ### 状态监听
 
-```kotlin
-val listener = object : OnPlayerEventListener {
-    override fun onPlaybackStateChanged(state: PlaybackState) {
-        when (state) {
-            PlaybackState.Idle -> TODO("空闲状态")
-            PlaybackState.Buffering -> TODO("缓冲中")
-            PlaybackState.Playing -> TODO("播放中")
-            PlaybackState.Paused -> TODO("已暂停")
-            PlaybackState.Completed -> TODO("播放完成")
-            PlaybackState.Stopped -> TODO("已停止")
-            is PlaybackState.Error -> TODO("错误: ${state.message}")
-        }
-    }
-
-    override fun onAudioChanged(audioInfo: AudioInfo?) {
-        TODO("当前音频: $audioInfo")
-    }
-
-    override fun onPlayProgress(position: Long, duration: Long) {
-        TODO("播放进度: $position / $duration")
-    }
-
-    override fun onPlayModeChanged(mode: PlayMode) {
-        TODO("播放模式: $mode")
-    }
-
-    override fun onError(message: String, exception: Throwable?) {
-        TODO("错误: $message")
-    }
-}
-
-StarSky.addListener(listener)
-StarSky.removeListener(listener)
-```
-
-### 使用 StateFlow 监听状态
-
-```kotlin
-// 播放状态
-StarSky.playbackState.collect { state ->
-    // 处理播放状态变化
-}
-
-// 当前音频
-StarSky.currentAudio.collect { audioInfo ->
-    // 处理当前音频变化
-}
-
-// 播放模式
-StarSky.playMode.collect { mode ->
-    // 处理播放模式变化
-}
-
-// 播放进度
-StarSky.playbackPosition.collect { position ->
-    // 处理播放进度变化
-}
-
-// 播放时长
-StarSky.playbackDuration.collect { duration ->
-    // 处理播放时长变化
-}
-
-// 是否正在播放
-StarSky.isPlaying.collect { isPlaying ->
-    // 处理播放状态变化
-}
-```
+通过监听器接口监听各种状态变化，包括播放状态、当前音频、播放进度、播放模式和错误等。也支持使用 StateFlow 进行响应式状态监听，包括播放状态、当前音频、播放模式、播放进度、播放时长、是否正在播放、当前播放列表和当前播放索引等。
 
 ### 通知功能
 
-```kotlin
-// 启用通知
-StarSky.enableNotification()
-
-// 禁用通知
-StarSky.disableNotification()
-```
+提供启用和禁用通知的方法，可在系统通知栏显示播放信息并提供控制按钮。
 
 ### 缓存管理
 
-```kotlin
-// 获取缓存大小
-val cacheSize = StarSky.getCacheSize()
-
-// 清理缓存
-StarSky.clearCache()
-```
+提供获取缓存大小和清理缓存的方法，支持自动缓存已播放的音频，使用 LRU 策略管理缓存空间。
 
 ### 播放状态持久化
 
-```kotlin
-// 恢复上次播放状态（在 Application 或 MainActivity 中调用）
-lifecycleScope.launch {
-    StarSky.restorePlaybackState()
-}
-
-// 清除持久化的播放状态
-lifecycleScope.launch {
-    StarSky.clearPlaybackState()
-}
-```
+支持恢复和清除持久化的播放状态，包括音频信息、播放列表、播放位置、播放模式、音量和播放速度等。
 
 ### 释放资源
 
-```kotlin
-// 在不需要时释放资源
-StarSky.release()
-```
+在不再需要使用播放器时，调用释放方法释放相关资源。
 
 ## 技术栈
 
@@ -277,10 +157,12 @@ starsky/
 
 ## 注意事项
 
-- 使用前必须调用 `StarSky.init(context)` 进行初始化
-- 通知功能需要 `FOREGROUND_SERVICE` 权限
+- 使用前必须调用初始化方法进行初始化
+- 通知功能需要 FOREGROUND_SERVICE 权限
 - 建议在 Application 或 MainActivity 中初始化
-- 不再使用时调用 `StarSky.release()` 释放资源
+- 不再使用时调用释放方法释放资源
+- 网络错误检测采用智能防抖机制，缓冲超过 3 秒且无进度变化时才判定为网络错误
+- 缓存使用 LRU 策略，默认最大缓存大小为 512MB
 
 ## 许可证
 

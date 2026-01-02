@@ -32,6 +32,7 @@ object PreferencesKeys {
     val SPEED = floatPreferencesKey("speed")
     val PLAYLIST = stringPreferencesKey("playlist")
     val CURRENT_INDEX = intPreferencesKey("current_index")
+    val PLAY_HISTORY = stringPreferencesKey("play_history")
 }
 
 class StarSkyPreferencesManager(private val context: Context) {
@@ -166,6 +167,28 @@ class StarSkyPreferencesManager(private val context: Context) {
     suspend fun clearPlaybackState() {
         dataStore.edit { preferences ->
             preferences.clear()
+        }
+    }
+
+    suspend fun savePlayHistory(history: List<AudioInfo>) {
+        val json = Json.encodeToString(history)
+        dataStore.edit { preferences ->
+            preferences[PreferencesKeys.PLAY_HISTORY] = json
+        }
+    }
+
+    fun getPlayHistory(): Flow<List<AudioInfo>> {
+        return dataStore.data.map { preferences ->
+            val json = preferences[PreferencesKeys.PLAY_HISTORY]
+            if (json != null) {
+                try {
+                    Json.decodeFromString<List<AudioInfo>>(json)
+                } catch (e: Exception) {
+                    emptyList()
+                }
+            } else {
+                emptyList()
+            }
         }
     }
 }

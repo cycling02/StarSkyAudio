@@ -97,6 +97,7 @@ class StarSkyMediaSessionService : MediaSessionService() {
         super.onDestroy()
     }
 
+    @Suppress("MissingSuperCall")
     override fun onBind(intent: Intent?): IBinder {
         return binder
     }

@@ -58,6 +58,10 @@ interface PlayerControl {
 
     fun hasNetworkError(): Boolean
 
+    fun getPlayHistory(): List<AudioInfo>
+
+    fun clearPlayHistory()
+
     val playbackState: StateFlow<PlaybackState>
 
     val currentAudio: StateFlow<AudioInfo?>
@@ -73,6 +77,8 @@ interface PlayerControl {
     val currentPlaylist: StateFlow<List<AudioInfo>>
 
     val currentIndex: StateFlow<Int>
+
+    val playHistory: StateFlow<List<AudioInfo>>
 
     fun addListener(listener: OnPlayerEventListener)
 
